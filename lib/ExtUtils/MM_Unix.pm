@@ -15,7 +15,7 @@ use ExtUtils::MakeMaker qw($Verbose neatvalue _sprintf562);
 
 # If $VERSION is in scope, parse_version() breaks
 {
-our $VERSION = '7.71_01';
+our $VERSION = '7.71_02';
 $VERSION =~ tr/_//d;
 }
 
@@ -1062,7 +1062,8 @@ sub xs_make_dynamic_lib {
             # both clang and gcc support -Wl,-rpath, but only clang supports
             # -rpath so by using -Wl,-rpath we avoid having to check for the
             # type of compiler
-            $ldrun = qq{-Wl,-rpath,"$self->{LD_RUN_PATH}"};
+	    my @dirs = split ':', $self->{LD_RUN_PATH};
+	    $ldrun = join " ", map(qq{-Wl,-rpath,"$_"}, @dirs);
         }
     }
 
@@ -1448,7 +1449,10 @@ sub init_dirscan {	# --- File and Directory Lists (.xs .pm .pod etc)
     foreach my $name ($self->lsdir($Curdir)){
 	next if $name =~ /\#/;
 	next if $name =~ $distprefix && -d $name;
-	$name = lc($name) if $Is{VMS};
+	if ($Is{VMS}) {
+		$name = lc($name);
+		$name = $Curdir if $name eq '.'; # don't confuse '.;1' with magic directory '.'
+	}
 	next if $name eq $Curdir or $name eq $Updir or $ignore{$name};
 	next unless $self->libscan($name);
 	if (-d $name){
@@ -1924,13 +1928,6 @@ EOP
         $self->{uc $m} ||= $Config{$m};
         $once_only{$m} = 1;
     }
-
-# This is too dangerous:
-#    if ($^O eq "next") {
-#	$self->{AR} = "libtool";
-#	$self->{AR_STATIC_ARGS} = "-o";
-#    }
-# But I leave it as a placeholder
 
     $self->{AR_STATIC_ARGS} ||= "cr";
 
@@ -2896,6 +2893,8 @@ Returns true, if the argument is likely to be a command.
 
 sub maybe_command {
     my($self,$file) = @_;
+    #    $file = '' if (!defined $file or !length $file);
+    return unless defined $file and length $file;
     return $file if -x $file && ! -d $file;
     return;
 }
