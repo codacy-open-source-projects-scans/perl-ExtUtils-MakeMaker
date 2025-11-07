@@ -12,7 +12,7 @@ BEGIN {
 
 use File::Spec;
 
-use Test::More tests => 30;
+use Test::More tests => 28;
 
 use Config;
 use TieOut;
@@ -52,13 +52,11 @@ sub test_fixin {
     my($code, $test) = @_;
 
     my $file = "fixin_test";
-    ok(open(my $fh, ">", $file), "write $file") or diag "Can't write $file: $!";
-    print $fh $code;
-    close $fh;
+    write_file($file, $code);
 
     MY->fixin($file);
 
-    ok(open($fh, "<", $file), "read $file") or diag "Can't read $file: $!";
+    ok(open(my $fh, "<", $file), "read $file") or diag "Can't read $file: $!";
     my @lines = <$fh>;
     close $fh;
 
@@ -110,7 +108,7 @@ END
 
 # fixin shouldn't pick this up.
 SKIP: {
-    skip "Not relevant on VMS", 4 if $^O eq 'VMS';
+    skip "Not relevant on VMS", 3 if $^O eq 'VMS';
     test_fixin(<<END,
 #!/foo/bar/perly -w
 
@@ -128,9 +126,24 @@ END
 }
 
 SKIP: {
+    skip "Not relevant on VMS or MSWin32", 3 if $^O eq 'VMS' || $^O eq 'MSWin32' || $^O eq 'cygwin';
+    local $ENV{PERL_MM_SHEBANG}='relocatable';
+    test_fixin(<<END,
+#!/usr/bin/env perl
+
+foo doo who doo
+END
+    sub {
+        my @lines = @_;
+        like $lines[0], qr[^#!/usr/bin/env perl\s$], "Relocatable perl";
+    }
+    );
+}
+
+SKIP: {
     eval { chmod(0755, "usrbin/interp") }
-        or skip "no chmod", 8;
-    skip "Not relevant on VMS or MSWin32", 8 if $^O eq 'VMS' || $^O eq 'MSWin32' || $^O eq 'cygwin';
+        or skip "no chmod", 6;
+    skip "Not relevant on VMS or MSWin32", 6 if $^O eq 'VMS' || $^O eq 'MSWin32' || $^O eq 'cygwin';
 
     my $dir = getcwd();
     local $ENV{PATH} = join $Config{path_sep}, map "$dir/$_", qw(usrbin bin);
